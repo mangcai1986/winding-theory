@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "winding-theory"
+version = "1.0.0"
+description = "Unified method for analysis and design of electrical machine winding topologies"
+readme = "README.md"
+authors = [
+    {name = "Mang Cai"}
+]
+license = {text = "MIT"}
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20",
+    "matplotlib>=3.4",
+]
+
+[project.urls]
+"Source" = "https://github.com/mangcai/winding-theory"
+"PhD Thesis" = "https://publikationsserver.tu-braunschweig.de/"
+
+[tool.setuptools.packages.find]
+include = ["winding*"]

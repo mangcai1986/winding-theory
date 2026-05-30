@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the original PhD thesis."
+authors:
+  - family-names: Cai
+    given-names: Mang
+title: "Contribution to the winding theory: Introduction of a unified method for the treatment of winding topology"
+date-released: 2017
+url: "https://publikationsserver.tu-braunschweig.de/"
+type: thesis
