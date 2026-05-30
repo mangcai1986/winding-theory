@@ -6,12 +6,9 @@ This directory contains the original PhD thesis and its tracking documents.
 
 | File | Description | Size |
 |------|-------------|------|
-| [paper.pdf](paper.pdf) | Original thesis PDF (16 MB) — tracked via Git LFS | 16 MB |
-| [paper.md](paper.md) | Full thesis text in Markdown (MinerU-extracted, with page markers) | 321 KB |
-| [mineru_paper_1.md](mineru_paper_1.md) | MinerU-extracted markdown (figures from later chapters) | 78 KB |
-| [mineru_paper_2.md](mineru_paper_2.md) | MinerU-extracted markdown (full text, cleaner format) | 290 KB |
-| [mineru_metadata_1.json](mineru_metadata_1.json) | MinerU JSON metadata (tracked via Git LFS) | 2.6 MB |
-| [mineru_metadata_2.json](mineru_metadata_2.json) | MinerU JSON metadata (tracked via Git LFS) | 11 MB |
+| [contribution-to-the-winding-theory.pdf](contribution-to-the-winding-theory.pdf) | Original thesis PDF — tracked via Git LFS | 16 MB |
+| [contribution-to-the-winding-theory.md](contribution-to-the-winding-theory.md) | Full thesis text in Markdown (MinerU-extracted) | 294 KB |
+| [contribution-to-the-winding-theory_mineru.json](contribution-to-the-winding-theory_mineru.json) | MinerU JSON metadata (full 200 pages) — tracked via Git LFS | 6 MB |
 
 ## Tracking Documents
 

@@ -4745,3 +4745,14 @@ Figure 6.46. : The double- and single-way connections : double-way connection (l
 Discussion of the resulting winding topologies Two obtained winding topologies are chosen for discussion. The rst one given in gure 6.47 is the classical double-layer 6-phase winding, which is exactly that introduced by N. Domann in [24] through modifying the classical 3-phase double-layer winding. The second one given in gure 6.48 is the combination of the multi-turn and the multi-coil topologies. It is characterized by a multi-layer topology with coils of dierent numbers of turns and coil pitches. 
 
 When compared with the classical double-layer winding (gure 6.47), where each coil group has 2 coils with coil pitch of 2 slot pitch, the novel topology introduces an additional coil with coil pitch of 7 slot pitch to surround the two coils. This leads to completely cancel the 7th overharmonic and to improve the winding factor of the working harmonic (γ = 5). 
+
+<!-- Additional images from mineru_paper_1.md -->
+
+![image](https://cdn-mineru.openxlab.org.cn/result/2026-05-30/84849b75-b6b3-4d9a-87ae-970da05a45a1/5cc0381baa6605c53e70bb05d77d0d4255878ad1be5b7463e9ff20d02c26dfeb.jpg)
+
+![image](https://cdn-mineru.openxlab.org.cn/result/2026-05-30/84849b75-b6b3-4d9a-87ae-970da05a45a1/76c7d9c64e20e459273b1be46bbc48d770f6f0f9c22f51c55c28538c602b06ec.jpg)
+
+![image](https://cdn-mineru.openxlab.org.cn/result/2026-05-30/84849b75-b6b3-4d9a-87ae-970da05a45a1/eea80ad51a94e05a67cd335b48b2f6147f40aa7e8a22f4f8f084de0022281691.jpg)
+
+![image](https://cdn-mineru.openxlab.org.cn/result/2026-05-30/84849b75-b6b3-4d9a-87ae-970da05a45a1/1e8b116cb6defe9d9e50ee7c8cd90587cf881291824d42d956363a91af356fec.jpg)
+
