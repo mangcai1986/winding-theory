@@ -1,2 +1,2 @@
-docs/thesis/contribution-to-the-winding-theory.pdf filter=lfs diff=lfs merge=lfs -text
-docs/thesis/contribution-to-the-winding-theory_mineru.json filter=lfs diff=lfs merge=lfs -text
+docs/thesis/contribution-to-the-winding-theory-introduction-of-a-unified-method-for-the-treatment-of-winding-topology.pdf filter=lfs diff=lfs merge=lfs -text
+docs/thesis/contribution-to-the-winding-theory-introduction-of-a-unified-method-for-the-treatment-of-winding-topology_metadata.json filter=lfs diff=lfs merge=lfs -text

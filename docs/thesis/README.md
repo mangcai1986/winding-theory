@@ -6,9 +6,9 @@ This directory contains the original PhD thesis and its tracking documents.
 
 | File | Description | Size |
 |------|-------------|------|
-| [contribution-to-the-winding-theory.pdf](contribution-to-the-winding-theory.pdf) | Original thesis PDF — tracked via Git LFS | 16 MB |
-| [contribution-to-the-winding-theory.md](contribution-to-the-winding-theory.md) | Full thesis text in Markdown (MinerU-extracted) | 294 KB |
-| [contribution-to-the-winding-theory_mineru.json](contribution-to-the-winding-theory_mineru.json) | MinerU JSON metadata (full 200 pages) — tracked via Git LFS | 6 MB |
+| [contribution-to-the-winding-theory-introduction-of-a-unified-method-for-the-treatment-of-winding-topology.pdf](contribution-to-the-winding-theory-introduction-of-a-unified-method-for-the-treatment-of-winding-topology.pdf) | Original thesis PDF — tracked via Git LFS | 16 MB |
+| [contribution-to-the-winding-theory-introduction-of-a-unified-method-for-the-treatment-of-winding-topology.md](contribution-to-the-winding-theory-introduction-of-a-unified-method-for-the-treatment-of-winding-topology.md) | Full thesis text in Markdown (MinerU-extracted) | 294 KB |
+| [contribution-to-the-winding-theory-introduction-of-a-unified-method-for-the-treatment-of-winding-topology_metadata.json](contribution-to-the-winding-theory-introduction-of-a-unified-method-for-the-treatment-of-winding-topology_metadata.json) | MinerU JSON metadata (full 200 pages) — tracked via Git LFS | 6 MB |
 
 ## Tracking Documents
 
