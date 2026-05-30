@@ -3,6 +3,10 @@
 This document maps the code in this repository to the corresponding
 sections of Mang Cai's PhD thesis.
 
+> **Thesis files:** See [docs/thesis/](thesis/) for the original PDF, Markdown, and MinerU metadata.
+>
+> **Synchronization tracking:** See [docs/thesis/tracking.md](thesis/tracking.md) for P0 paper-code synchronization status.
+
 ## Thesis Information
 
 - **Title:** Contribution to the winding theory: Introduction of a unified method for the treatment of winding topology
