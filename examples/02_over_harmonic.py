@@ -1,90 +1,89 @@
 """
-Example 2: 12-slot, 3-phase winding with 5th over-harmonic (γ = 5).
+Example 2 (Full): 12-slot, 3-phase winding with 5th over-harmonic (γ = 5).
 
-This demonstrates the design pipeline for an over-harmonic winding,
-where the 5th harmonic is chosen as the working harmonic.
+Complete end-to-end demonstration of over-harmonic winding design.
 
 Based on thesis Chapter 6, Section 6.1.
 """
 
-import sys
-import os
+import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import matplotlib
+matplotlib.use('Agg')
 matplotlib.rcParams['text.usetex'] = False
-
 import matplotlib.pyplot as plt
 import numpy as np
+
 from winding.models import CurrentSystem, WindingSpectrum
 from winding.analysis import get_mmf
 from winding.design import (
-    get_primitive_multiphase_winding,
-    get_single_phase_winding,
-    get_coil_group,
-    get_coil,
+    get_primitive_multiphase_winding, get_single_phase_winding,
+    get_coil_group, get_coil,
 )
+from winding.modification import (
+    winding_topology_double_way_connection,
+    winding_topology_single_way_connection_md,
+    winding_topology_single_way_connection_sp,
+    obtain_multi_turn_winding_topology,
+    obtain_multi_layer_winding_topology,
+    obtain_double_layer_winding_topology,
+    obtain_single_layer_winding_topology,
+)
+from winding_plot.spectrum import draw_star_of_spectrums, show_winding_spectrum
+from winding_plot.mmf import draw_star_of_mmfs
 
-# ======================================================================
-# Design Parameters
-# ======================================================================
-n_slots = 12
-n_phases = 3
-working_harmonic = 5
+N_SLOTS = 12; N_PHASES = 3; WORKING_HARMONIC = 5
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'output', 'ex02')
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-show_figures = True
-output_dir = os.path.join(os.path.dirname(__file__), '..', 'output')
-os.makedirs(output_dir, exist_ok=True)
+print("=" * 60)
+print("Example 2: 12-slot, 3-phase, 5th over-harmonic (γ=5)")
+print("=" * 60)
 
-# ======================================================================
-# 1. Symmetrical Multi-Phase Current System
-# ======================================================================
-current_system = CurrentSystem(n_phases, current_system_flag=0)
+current_system = CurrentSystem(N_PHASES, current_system_flag=0)
 
-# ======================================================================
-# 2. Ideal Winding Spectrum
-# ======================================================================
-ideal_spectrum = WindingSpectrum(n_slots, working_harmonic)
+fig = plt.figure(facecolor='white', figsize=(4, 4), dpi=100)
+draw_star_of_spectrums(WindingSpectrum(N_SLOTS, WORKING_HARMONIC).distribution, 'r')
+fig.savefig(os.path.join(OUTPUT_DIR, '02_ideal_spectrum.pdf')); plt.close(fig)
 
-if show_figures:
-    plt.figure(facecolor='white', figsize=(4, 4), dpi=100)
-    from winding_plot.spectrum import draw_star_of_spectrums
-    draw_star_of_spectrums(ideal_spectrum.distribution, 'r')
-    plt.savefig(os.path.join(output_dir, '602_2_over_harmonic_spectrum.pdf'))
+ideal_mmf = get_mmf(WindingSpectrum(N_SLOTS, WORKING_HARMONIC))
+fig = plt.figure(facecolor='w', figsize=(4, 4), dpi=100)
+draw_star_of_mmfs(ideal_mmf.distribution, 'r')
+fig.savefig(os.path.join(OUTPUT_DIR, '03_ideal_mmf.pdf')); plt.close(fig)
 
-# ======================================================================
-# 3. Ideal MMF Distribution
-# ======================================================================
-ideal_mmf = get_mmf(ideal_spectrum)
-
-if show_figures:
-    plt.figure(facecolor='w', figsize=(4, 4), dpi=100)
-    from winding_plot.mmf import draw_star_of_mmfs
-    draw_star_of_mmfs(ideal_mmf.distribution, 'r')
-    plt.savefig(os.path.join(output_dir, '603_2_over_harmonic_mmf.pdf'))
-
-# ======================================================================
-# 4. Primitive Multi-Phase Winding
-# ======================================================================
 windings = get_primitive_multiphase_winding(ideal_mmf, current_system)
-print(f"Generated {len(windings)} primitive multi-phase winding types")
+sp = get_single_phase_winding(windings, 0)
+cg = get_coil_group(sp)
+coils = get_coil(cg)
 
-# ======================================================================
-# 5. Single-Phase Winding (Rotation Symmetry)
-# ======================================================================
-single_phase = get_single_phase_winding(windings, current_system_flag=0)
-print(f"Generated {len(single_phase)} single-phase winding types")
+dw = winding_topology_double_way_connection(cg)
+sw_md = winding_topology_single_way_connection_md(cg)
+sw_sp = winding_topology_single_way_connection_sp(cg)
+mt = obtain_multi_turn_winding_topology(dw)
+ml = obtain_multi_layer_winding_topology(mt)
+dl = obtain_double_layer_winding_topology(sw_md)
+sl = obtain_single_layer_winding_topology(mt)
 
-# ======================================================================
-# 6. Coil Group (Mirror Symmetry)
-# ======================================================================
-coil_groups = get_coil_group(single_phase)
-print(f"Generated {len(coil_groups)} coil groups")
+print(f"Primitive windings: {len(windings)} types")
+print(f"Coil groups: {len(cg)} groups")
+for i, c in enumerate(coils): print(f"  Coils type {i+1}: {len(c)}")
+print(f"Double-way: {len(dw)}, Multi-coil: {len(sw_md)}, Multi-conductor: {len(sw_sp)}")
+print(f"Multi-turn: {len(mt)}, Multi-layer: {len(ml)}")
+print(f"Double-layer: {len(dl)}, Single-layer: {len(sl)}")
 
-# ======================================================================
-# 7. All Possible Coils
-# ======================================================================
-coils = get_coil(coil_groups)
-print(f"Generated coils for {len(coils)} connection matrix types")
+print("\n--- Winding Factor Comparison ---")
+for label, topologies in [("Double-layer", dl), ("Single-layer", sl)]:
+    for i, topo in enumerate(topologies):
+        ws = topo.winding_spectrum_real
+        idx = N_SLOTS // 2 + WORKING_HARMONIC - 1
+        wf = np.abs(ws[idx])
+        print(f"  {label} type {i+1}: |ξ({WORKING_HARMONIC})| = {wf:.4f}")
 
-print("\n=== Over-harmonic winding design pipeline completed successfully ===")
+if dl:
+    fig = plt.figure(facecolor='w', figsize=(6, 4), dpi=100)
+    show_winding_spectrum(dl[0].winding_spectrum_real)
+    fig.savefig(os.path.join(OUTPUT_DIR, '08_double_layer_spectrum.pdf')); plt.close(fig)
+
+print(f"\nFigures saved to: {OUTPUT_DIR}")
+print("=== Example 2 completed successfully ===")

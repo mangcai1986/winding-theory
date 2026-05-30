@@ -1,73 +1,78 @@
 """
-Example 3: 9-slot, 3-phase winding with 4th over-harmonic (γ = 4).
+Example 3 (Full): 9-slot, 3-phase winding with 4th over-harmonic (γ = 4).
 
 Based on thesis Chapter 6, Section 6.2.
 """
 
-import sys
-import os
+import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import matplotlib
+matplotlib.use('Agg')
 matplotlib.rcParams['text.usetex'] = False
+import matplotlib.pyplot as plt
+import numpy as np
 
 from winding.models import CurrentSystem, WindingSpectrum
 from winding.analysis import get_mmf
 from winding.design import (
-    get_primitive_multiphase_winding,
-    get_single_phase_winding,
-    get_coil_group,
-    get_coil,
+    get_primitive_multiphase_winding, get_single_phase_winding,
+    get_coil_group, get_coil,
 )
+from winding.modification import (
+    winding_topology_double_way_connection,
+    winding_topology_single_way_connection_md,
+    winding_topology_single_way_connection_sp,
+    obtain_multi_turn_winding_topology,
+    obtain_multi_layer_winding_topology,
+    obtain_double_layer_winding_topology,
+    obtain_single_layer_winding_topology,
+)
+from winding_plot.spectrum import show_winding_spectrum
 
-# ======================================================================
-# Design Parameters
-# ======================================================================
-n_slots = 9
-n_phases = 3
-working_harmonic = 4
+N_SLOTS = 9; N_PHASES = 3; WORKING_HARMONIC = 4
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'output', 'ex03')
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-show_figures = True
-output_dir = os.path.join(os.path.dirname(__file__), '..', 'output')
-os.makedirs(output_dir, exist_ok=True)
+print("=" * 60)
+print("Example 3: 9-slot, 3-phase, 4th over-harmonic (γ=4)")
+print("=" * 60)
 
-# ======================================================================
-# 1. Symmetrical Multi-Phase Current System
-# ======================================================================
-current_system = CurrentSystem(n_phases, current_system_flag=0)
+current_system = CurrentSystem(N_PHASES, current_system_flag=0)
+ideal_mmf = get_mmf(WindingSpectrum(N_SLOTS, WORKING_HARMONIC))
 
-# ======================================================================
-# 2. Ideal Winding Spectrum
-# ======================================================================
-ideal_spectrum = WindingSpectrum(n_slots, working_harmonic)
-
-# ======================================================================
-# 3. Ideal MMF Distribution
-# ======================================================================
-ideal_mmf = get_mmf(ideal_spectrum)
-
-# ======================================================================
-# 4. Primitive Multi-Phase Winding
-# ======================================================================
 windings = get_primitive_multiphase_winding(ideal_mmf, current_system)
-print(f"Generated {len(windings)} primitive multi-phase winding types")
+sp = get_single_phase_winding(windings, 0)
+cg = get_coil_group(sp)
+coils = get_coil(cg)
 
-# ======================================================================
-# 5. Single-Phase Winding (Rotation Symmetry)
-# ======================================================================
-single_phase = get_single_phase_winding(windings, current_system_flag=0)
-print(f"Generated {len(single_phase)} single-phase winding types")
+dw = winding_topology_double_way_connection(cg)
+sw_md = winding_topology_single_way_connection_md(cg)
+sw_sp = winding_topology_single_way_connection_sp(cg)
+mt = obtain_multi_turn_winding_topology(dw)
+ml = obtain_multi_layer_winding_topology(mt)
+dl = obtain_double_layer_winding_topology(sw_md)
+sl = obtain_single_layer_winding_topology(mt)
 
-# ======================================================================
-# 6. Coil Group (Mirror Symmetry)
-# ======================================================================
-coil_groups = get_coil_group(single_phase)
-print(f"Generated {len(coil_groups)} coil groups")
+print(f"Primitive windings: {len(windings)} types")
+print(f"Coil groups: {len(cg)} groups")
+for i, c in enumerate(coils): print(f"  Coils type {i+1}: {len(c)}")
+print(f"Double-way: {len(dw)}, Multi-coil: {len(sw_md)}, Multi-conductor: {len(sw_sp)}")
+print(f"Multi-turn: {len(mt)}, Multi-layer: {len(ml)}")
+print(f"Double-layer: {len(dl)}, Single-layer: {len(sl)}")
 
-# ======================================================================
-# 7. All Possible Coils
-# ======================================================================
-coils = get_coil(coil_groups)
-print(f"Generated coils for {len(coils)} connection matrix types")
+print("\n--- Winding Factor Comparison ---")
+for label, topologies in [("Double-layer", dl), ("Single-layer", sl)]:
+    for i, topo in enumerate(topologies):
+        ws = topo.winding_spectrum_real
+        idx = np.argmax(np.abs(ws))
+        wf = np.abs(ws[idx])
+        print(f"  {label} type {i+1}: max |ξ| = {wf:.4f}")
 
-print("\n=== 9-slot, 4th harmonic winding design completed successfully ===")
+if dl:
+    fig = plt.figure(facecolor='w', figsize=(6, 4), dpi=100)
+    show_winding_spectrum(dl[0].winding_spectrum_real)
+    fig.savefig(os.path.join(OUTPUT_DIR, 'double_layer_spectrum.pdf')); plt.close(fig)
+
+print(f"\nFigures saved to: {OUTPUT_DIR}")
+print("=== Example 3 completed successfully ===")
