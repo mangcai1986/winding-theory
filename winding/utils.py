@@ -12,9 +12,12 @@ import numpy as np
 from numpy import linalg as LA
 
 
+# Tolerance for detecting equal-magnitude phase vectors
+_EQUAL_MAGNITUDE_TOLERANCE = 1e-10
+
+
 def proj(multi_phase_current_system, mmf_n, n=2):
-    """
-    Find the two phase current vectors that best approximate a given MMF phasor.
+    """Find the two phase current vectors that best approximate a given MMF phasor.
 
     Returns the indices of the two closest phase currents.
 
@@ -40,8 +43,7 @@ def proj(multi_phase_current_system, mmf_n, n=2):
 
 
 def calc_connection(mmf_n, multi_phase_current_system, k0, k1):
-    """
-    Calculate the connection coefficients for a given MMF phasor
+    """Calculate the connection coefficients for a given MMF phasor
     projected onto two phase current vectors.
 
     Parameters
@@ -70,8 +72,9 @@ def calc_connection(mmf_n, multi_phase_current_system, k0, k1):
 
     x_out = np.around(x, decimals=10)
 
-    # Handle equal-length case by adding a small perturbation
-    if np.abs(x_out[0]) - np.abs(x_out[1]) == 0.:
+    # Handle equal-length case: if both coefficients have the same magnitude,
+    # add a small perturbation to break the degeneracy.
+    if abs(abs(x_out[0]) - abs(x_out[1])) < _EQUAL_MAGNITUDE_TOLERANCE:
         bcomp = mmf_n * np.exp(1j * 0.000001)
         b = np.vstack((np.real(bcomp), np.imag(bcomp)))
         x = LA.solve(A, b)
@@ -81,8 +84,7 @@ def calc_connection(mmf_n, multi_phase_current_system, k0, k1):
 
 
 def coil_pitch(a, b, N):
-    """
-    Calculate the coil pitch (shortest path) between two slot positions.
+    """Calculate the coil pitch (shortest path) between two slot positions.
 
     Parameters
     ----------
@@ -104,8 +106,7 @@ def coil_pitch(a, b, N):
 
 
 def calculate_number_of_turns(connection_matrix, conductor_distribution):
-    """
-    Solve for the number of turns using least-squares approximation.
+    """Solve for the number of turns using least-squares approximation.
 
     Parameters
     ----------
@@ -135,13 +136,41 @@ def calculate_number_of_turns(connection_matrix, conductor_distribution):
 
 
 def normalize_cond_distri(cond_distri, m_cond_distri):
-    """Normalize a conductor distribution using a multi-phase distribution."""
+    """Normalize a conductor distribution using a multi-phase distribution.
+
+    Parameters
+    ----------
+    cond_distri : ndarray
+        Single-phase conductor distribution.
+    m_cond_distri : ndarray
+        Multi-phase conductor distribution.
+
+    Returns
+    -------
+    ndarray
+        Integer-normalized conductor distribution.
+    """
     m_cond_distri_ = np.sum(np.abs(m_cond_distri), axis=1)
     return np.rint(cond_distri / np.amax(m_cond_distri_) * 1e2).astype(int)
 
 
 def s2m_cond_distri(s_cond_distri, rsym_matrix_i, rsym_matrix_ii):
-    """Convert single-phase conductor distribution to multi-phase using symmetry."""
+    """Convert single-phase conductor distribution to multi-phase using symmetry.
+
+    Parameters
+    ----------
+    s_cond_distri : ndarray
+        Single-phase conductor distribution.
+    rsym_matrix_i : ndarray
+        Rotation symmetry matrix (type I, slot rotation).
+    rsym_matrix_ii : ndarray
+        Rotation symmetry matrix (type II, phase rotation).
+
+    Returns
+    -------
+    ndarray
+        Multi-phase conductor distribution matrix.
+    """
     n_phases = np.size(rsym_matrix_ii, axis=0)
     n_slots = np.size(rsym_matrix_i, axis=0)
     connection_matrix_of_coil_ = np.zeros((n_slots, n_phases))
@@ -154,7 +183,18 @@ def s2m_cond_distri(s_cond_distri, rsym_matrix_i, rsym_matrix_ii):
 
 
 def sum_str_vector(str_vector):
-    """Concatenate a vector of strings into a single string."""
+    """Concatenate a vector of strings into a single string.
+
+    Parameters
+    ----------
+    str_vector : ndarray
+        Array of strings.
+
+    Returns
+    -------
+    str
+        Concatenated string.
+    """
     result = str_vector[0]
     for i in range(1, str_vector.size):
         result = result + str_vector[i]
@@ -162,12 +202,36 @@ def sum_str_vector(str_vector):
 
 
 def sel(a, b):
-    """Select elements of a at indices b, zero elsewhere."""
+    """Select elements of a at indices b, zero elsewhere.
+
+    Parameters
+    ----------
+    a : ndarray
+        Input array.
+    b : ndarray
+        Indices to select.
+
+    Returns
+    -------
+    ndarray
+        Array with selected elements preserved, others zeroed.
+    """
     a_b = np.zeros(np.shape(a))
     a_b[b] = a[b]
     return a_b
 
 
 def init_list_of_objects(size):
-    """Create a list of empty lists."""
+    """Create a list of empty lists.
+
+    Parameters
+    ----------
+    size : int
+        Number of empty lists to create.
+
+    Returns
+    -------
+    list of list
+        List of empty lists.
+    """
     return [[] for _ in range(size)]

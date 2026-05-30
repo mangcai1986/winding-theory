@@ -76,15 +76,13 @@ def draw_star_of_mmf_and_currents(mmf_phasors, mmf_color, mmf_style,
 
 
 def draw_polar_coordinate_system(harmonic_vector):
-    """Draw a polar coordinate system."""
-    n_harmonics = np.size(harmonic_vector)
-    alpha = np.linspace(0, 2 * np.pi, 100)
-    for r in np.linspace(0, 1, 6):
-        plt.plot(r * np.cos(alpha), r * np.sin(alpha), linestyle=':', color='black')
-    plt.plot(np.cos(alpha), np.sin(alpha), 'black')
-    for i in range(n_harmonics):
-        x = np.cos(2 * np.pi / n_harmonics * harmonic_vector[i])
-        y = np.sin(2 * np.pi / n_harmonics * harmonic_vector[i])
-        plt.plot([0, x], [0, y], linestyle=':', color='black')
-        plt.text(1.1 * x, 1.1 * y, "%i" % i,
-                 horizontalalignment='center', verticalalignment='center')
+    """Draw a polar coordinate system.
+
+    Parameters
+    ----------
+    harmonic_vector : ndarray
+        Harmonic order vector.
+    """
+    # Delegated to spectrum module to avoid duplication
+    from winding_plot.spectrum import draw_polar_coordinate_system as _draw
+    _draw(harmonic_vector)

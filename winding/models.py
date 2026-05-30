@@ -4,8 +4,8 @@ Data classes for winding topology representation.
 These classes form the hierarchical data structure used throughout
 the winding analysis and design methods. The hierarchy is:
 
-    WindingSpectrum → MMF → MultiPhaseWinding → SinglePhaseWinding
-        → CoilGroup → Coil → PriMultiLayerTurnPitchTopo
+    WindingSpectrum -> MMF -> MultiPhaseWinding -> SinglePhaseWinding
+        -> CoilGroup -> Coil -> PriMultiLayerTurnPitchTopo
 
 Author: Mang Cai (original CaisModule.py, 2016)
 Refactored: 2026
@@ -15,7 +15,18 @@ import numpy as np
 
 
 class WindingSpectrum:
-    """Winding factor harmonic spectrum of a winding topology."""
+    """Winding factor harmonic spectrum of a winding topology.
+
+    Parameters
+    ----------
+    n_slots : int
+        Number of slots.
+    working_harmonic : int
+        The working harmonic order (gamma).
+    type_ : str
+        'Ideal' generates a spectrum with only the working harmonic present;
+        otherwise the distribution is left uninitialized (NaN).
+    """
 
     def __init__(self, n_slots, working_harmonic, type_='Ideal'):
         self.working_harmonic = working_harmonic
@@ -23,11 +34,22 @@ class WindingSpectrum:
         if type_ == 'Ideal':
             self.distribution = _get_ideal_winding_spectrum(n_slots, working_harmonic)
         else:
-            self.distribution = np.nan
+            self.distribution = None
 
 
 class CurrentSystem:
-    """Multi-phase current system (symmetrical)."""
+    """Multi-phase current system (symmetrical).
+
+    Parameters
+    ----------
+    n_phases : int
+        Number of phases.
+    type_ : str
+        'Symmetric' generates a symmetrical multi-phase system.
+    current_system_flag : int
+        0 for source current system (default),
+        1 for winding design current system.
+    """
 
     def __init__(self, n_phases, type_='Symmetric', current_system_flag=0):
         self.n_phases = n_phases
@@ -41,92 +63,207 @@ class CurrentSystem:
             elif current_system_flag == 1:
                 self.distribution = self.distribution_4_winding_design
         else:
-            self.distribution = np.nan
+            self.distribution = None
 
 
 class MMF:
-    """Magneto-motive force distribution."""
+    """Magneto-motive force distribution.
+
+    Parameters
+    ----------
+    winding_spectrum : WindingSpectrum
+        Parent winding spectrum object.
+    """
 
     def __init__(self, winding_spectrum):
         self.parent_winding_spectrum = winding_spectrum
-        self.transformation_matrix = np.nan
-        self.distribution = np.nan
+        self.transformation_matrix = None
+        self.distribution = None
 
 
 class MultiPhaseWinding:
-    """Primitive multi-phase winding topology."""
+    """Primitive multi-phase winding topology.
+
+    Parameters
+    ----------
+    mmf : MMF
+        Parent MMF object.
+    current_system : ndarray
+        Multi-phase current system vector.
+    """
 
     def __init__(self, mmf, current_system):
         self.parent_mmf = mmf
-        self.connection_matrix = np.nan
+        self.connection_matrix = None
         self.current_system = current_system
+
+    @property
+    def working_harmonic(self):
+        """Convenience: working harmonic from the parent MMF -> spectrum chain."""
+        return self.parent_mmf.parent_winding_spectrum.working_harmonic
 
 
 class SinglePhaseWinding:
-    """Primitive single-phase winding topology."""
+    """Primitive single-phase winding topology (rotation symmetry exploited).
+
+    Parameters
+    ----------
+    multi_phase_winding : MultiPhaseWinding
+        Parent multi-phase winding object.
+    """
 
     def __init__(self, multi_phase_winding):
         self.parent_multi_phase_winding = multi_phase_winding
-        self.rotation_symmetry_matrix = np.nan
-        self.rotation_symmetry_matrix_type_ii = np.nan
-        self.connection_vector = np.nan
-        self.has_symmetry = np.nan
+        self.rotation_symmetry_matrix = None
+        self.rotation_symmetry_matrix_type_ii = None
+        self.connection_vector = None
+        self.has_symmetry = None
+
+    @property
+    def working_harmonic(self):
+        """Convenience: working harmonic from parent chain."""
+        return self.parent_multi_phase_winding.working_harmonic
+
+    @property
+    def current_system(self):
+        """Convenience: current system from parent chain."""
+        return self.parent_multi_phase_winding.current_system
 
 
 class CoilGroup:
-    """Primitive coil group (mirror symmetry exploited)."""
+    """Primitive coil group (mirror symmetry exploited).
+
+    Parameters
+    ----------
+    single_phase_winding : SinglePhaseWinding
+        Parent single-phase winding object.
+    """
 
     def __init__(self, single_phase_winding):
         self.parent_single_phase_winding = single_phase_winding
-        self.mirror_symmetry_matrix = np.nan
-        self.connection_vector = np.nan
-        self.position_of_symmetry_axis = np.nan
-        self.has_symmetry = np.nan
+        self.mirror_symmetry_matrix = None
+        self.connection_vector = None
+        self.position_of_symmetry_axis = None
+        self.has_symmetry = None
+        # Internal: full mirror symmetry matrix (not reduced)
+        self._mirror_symmetry_matrix = None
+
+    @property
+    def working_harmonic(self):
+        """Convenience: working harmonic from parent chain."""
+        return self.parent_single_phase_winding.working_harmonic
+
+    @property
+    def current_system(self):
+        """Convenience: current system from parent chain."""
+        return self.parent_single_phase_winding.current_system
+
+    @property
+    def rotation_symmetry_matrix(self):
+        """Convenience: rotation symmetry matrix from parent chain."""
+        return self.parent_single_phase_winding.rotation_symmetry_matrix
+
+    @property
+    def rotation_symmetry_matrix_type_ii(self):
+        """Convenience: type II rotation symmetry matrix from parent chain."""
+        return self.parent_single_phase_winding.rotation_symmetry_matrix_type_ii
 
 
 class Coil:
-    """A single coil within a coil group."""
+    """A single coil within a coil group.
+
+    Parameters
+    ----------
+    coil_group : CoilGroup
+        Parent coil group object.
+    """
 
     def __init__(self, coil_group):
         self.parent_coil_group = coil_group
-        self.connection_vector = np.nan
-        self.pitch = np.nan
-        self.position = np.nan
-        self.winding_spectrum = np.nan
-        self.connection_matrix = np.nan
+        self.connection_vector = None
+        self.pitch = None
+        self.position = None
+        self.winding_spectrum = None
+        self.connection_matrix = None
 
 
 class CategoryOfCoil:
-    """Category of coils grouped by pitch or spectrum."""
+    """Category of coils grouped by pitch or spectrum.
+
+    Parameters
+    ----------
+    set_of_coil : list of Coil
+        Coils belonging to this category.
+    """
 
     def __init__(self, set_of_coil):
         self.set_of_coil = set_of_coil
-        self.coil_pitch = np.nan
-        self.winding_spectrum = np.nan
-        self.type_ = np.nan  # 0 for same pitch, 1 for same spectrum
+        self.coil_pitch = None
+        self.winding_spectrum = None
+        self.type_ = None  # 0 for same pitch, 1 for same spectrum
 
 
 class ModifiedMultiPhaseWinding:
-    """Modified (realizable) multi-phase winding topology."""
+    """Modified (realizable) multi-phase winding topology.
+
+    Container for all derived winding topology variants
+    (multi-turn, multi-layer, multi-coil, multi-conductor, etc.).
+    """
 
     def __init__(self):
-        self.n_layers = np.nan
-        self.n_total_conductors = np.nan
-        self.multi_coil = np.nan
-        self.multi_turn = np.nan
-        self.multi_conductor = np.nan
-        self.classical = np.nan
-        self.set_of_coil = np.nan
-        self.mirror_symmetry_matrix = np.nan
-        self.rotation_symmetry_matrix = np.nan
-        self.rotation_symmetry_matrix_type_ii = np.nan
-        self.current_system = np.nan
-        self.error = np.nan
-        self.winding_spectrum = np.nan
+        self.n_layers = None
+        self.n_total_conductors = None
+        self.multi_coil = None
+        self.multi_turn = None
+        self.multi_conductor = None
+        self.classical = None
+        self.set_of_coil = None
+        self.mirror_symmetry_matrix = None
+        self.rotation_symmetry_matrix = None
+        self.rotation_symmetry_matrix_type_ii = None
+        self.current_system = None
+        self.error = None
+        self.winding_spectrum = None
 
 
 class PriMultiLayerTurnPitchTopo:
-    """Primitive multi-layer, multi-turn winding topology (intermediate result)."""
+    """Primitive multi-layer, multi-turn winding topology (intermediate result).
+
+    This class captures both the ideal and realized conductor distributions,
+    along with the derived winding spectrum. It is the output of all
+    modification pipeline functions.
+
+    Parameters
+    ----------
+    conductor_distribution_ideal : ndarray
+        Ideal (target) conductor distribution.
+    conductor_distribution_real : ndarray
+        Realized conductor distribution.
+    connection_vector : ndarray
+        Coil connection vector (positive/negative conductor indices).
+    coil_pitch : ndarray
+        Pitch of each coil.
+    connection_matrix : ndarray
+        Connection matrix of shape (n_slots, n_coils).
+    n_turns : ndarray
+        Number of turns per coil.
+    error_rel : float
+        Relative error of the turn approximation.
+    multi_cond_matrix : ndarray
+        Multi-conductor matrix (for single-way SP connections).
+    msym_matrix : ndarray
+        Mirror symmetry matrix (reduced, upper part).
+    rsym_matrix_i : ndarray
+        Rotation symmetry matrix (type I).
+    rsym_matrix_ii : ndarray
+        Rotation symmetry matrix (type II).
+    m_pha_curr_sys : ndarray
+        Multi-phase current system.
+    _msym_matrix : ndarray
+        Full mirror symmetry matrix (not reduced).
+    working_harmonic : int
+        Working harmonic order.
+    """
 
     def __init__(self, conductor_distribution_ideal, conductor_distribution_real,
                  connection_vector, coil_pitch, connection_matrix, n_turns, error_rel,
@@ -163,6 +300,18 @@ class PriMultiLayerTurnPitchTopo:
         self.winding_spectrum_ideal = _winding_topology_to_spectrum(self.m_cond_distri_ideal, self.m_pha_curr_sys)
 
     def select_coils(self, index_of_coils):
+        """Select a subset of coils by index.
+
+        Parameters
+        ----------
+        index_of_coils : list of int
+            Indices of coils to select.
+
+        Returns
+        -------
+        list
+            Empty list (placeholder for future implementation).
+        """
         return []
 
 
@@ -171,6 +320,7 @@ class PriMultiLayerTurnPitchTopo:
 # ============================================================================
 
 def _get_ideal_winding_spectrum(n_slots, working_harmonic):
+    """Generate an ideal winding spectrum: 1 at the working harmonic, 0 elsewhere."""
     if bool(n_slots % 2):
         harmonic_neg_limit = -(n_slots + 1) / 2 + 1
         harmonic_pos_limit = (n_slots - 1) / 2
@@ -185,10 +335,25 @@ def _get_ideal_winding_spectrum(n_slots, working_harmonic):
 
 
 def _get_current_system_4_winding_design(n_phases):
+    """Generate the winding design current system (evenly spaced phasors over pi rad)."""
     return np.exp(1j * np.linspace(0, np.pi, n_phases, endpoint=False))
 
 
 def _get_current_system_of_source(current_system_4_winding_design):
+    """Build the source current system by factoring out powers of two.
+
+    The algorithm repeatedly divides the number of phases by 2.
+    If an odd factor remains, the current system includes a
+    zero-sequence component, and the corresponding phase indices
+    are negated.
+
+    Returns
+    -------
+    clamp_matrix : ndarray
+        Diagonal matrix with -1 at negated phase indices.
+    current_system_of_source : ndarray
+        Adjusted current system vector.
+    """
     m = current_system_4_winding_design.size
     current_system_of_source = np.copy(current_system_4_winding_design)
     has_zero = 0
@@ -197,6 +362,7 @@ def _get_current_system_of_source(current_system_4_winding_design):
     m_ = m
     k = 0
     g = 0
+    # Factor out powers of 2: m = 2^k * m_odd
     while True:
         if np.mod(m_, 2) == 1:
             has_zero = 1
@@ -204,9 +370,10 @@ def _get_current_system_of_source(current_system_4_winding_design):
         else:
             g = 2 ** k
             k = k + 1
-            m_ = m / 2
+            m_ = m_ / 2
 
     if has_zero == 1:
+        # Negate the phase indices corresponding to the zero-sequence component
         index = np.linspace(2 ** g, 2 * 2 ** g, 2 ** g, endpoint=False, dtype=int)
         current_system_of_source[index] = -1 * current_system_4_winding_design[index]
         clamp_matrix[index, index] = -1
@@ -215,6 +382,25 @@ def _get_current_system_of_source(current_system_4_winding_design):
 
 
 def _s2m_cond_distri(s_cond_distri, rsym_matrix_i, rsym_matrix_ii):
+    """Convert a single-phase conductor distribution to multi-phase using symmetry.
+
+    The multi-phase distribution is reconstructed by applying successive
+    rotation powers to the single-phase vector.
+
+    Parameters
+    ----------
+    s_cond_distri : ndarray
+        Single-phase conductor distribution.
+    rsym_matrix_i : ndarray
+        Rotation symmetry matrix (type I, slot rotation).
+    rsym_matrix_ii : ndarray
+        Rotation symmetry matrix (type II, phase rotation).
+
+    Returns
+    -------
+    ndarray
+        Multi-phase conductor distribution matrix.
+    """
     from numpy import linalg as LA
     n_phases = np.size(rsym_matrix_ii, axis=0)
     n_slots = np.size(rsym_matrix_i, axis=0)
@@ -228,6 +414,7 @@ def _s2m_cond_distri(s_cond_distri, rsym_matrix_i, rsym_matrix_ii):
 
 
 def _winding_topology_to_spectrum(winding_topology, current_phase_vector):
+    """Internal: winding factor spectrum from topology (no normalization)."""
     n_slots = np.size(winding_topology, axis=0)
     position_vector = np.linspace(1, n_slots, n_slots)
 

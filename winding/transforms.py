@@ -13,8 +13,7 @@ from numpy import linalg as LA
 
 
 def detect_rotation_symmetry(connection_matrix):
-    """
-    Detect rotational symmetry of a connection matrix.
+    """Detect rotational symmetry of a connection matrix.
 
     Finds the smallest rotation (g, h) such that the matrix is invariant
     under simultaneous rotation of slot and phase indices.
@@ -55,10 +54,10 @@ def detect_rotation_symmetry(connection_matrix):
             matrix_of_rotation_symmetry_type_i[n1, k1] = 1
             matrix_of_rotation_symmetry_type_ii[n2, k2] = 1
 
-            residum = connection_matrix - matrix_of_rotation_symmetry_type_i.dot(connection_matrix).dot(
+            residual = connection_matrix - matrix_of_rotation_symmetry_type_i.dot(connection_matrix).dot(
                 matrix_of_rotation_symmetry_type_ii)
 
-            if LA.norm(residum, np.inf) < 1E-10:
+            if LA.norm(residual, np.inf) < 1E-10:
                 has_symmetry = 1
                 matrix_of_rotation_symmetry = matrix_of_rotation_symmetry_type_i
                 connection_vector = connection_matrix[:, 0]
@@ -68,8 +67,7 @@ def detect_rotation_symmetry(connection_matrix):
 
 
 def detect_mirror_symmetry(connection_vector):
-    """
-    Detect mirror symmetry of a connection vector.
+    """Detect mirror symmetry of a connection vector.
 
     Finds the axis position g such that the vector is invariant
     under reflection.
@@ -99,8 +97,8 @@ def detect_mirror_symmetry(connection_vector):
         n = np.mod(g - k, N)
         matrix_of_mirror_symmetry[n, k] = 1
 
-        residum = connection_vector - matrix_of_mirror_symmetry.dot(connection_vector)
-        if LA.norm(residum, np.inf) < 1E-6:
+        residual = connection_vector - matrix_of_mirror_symmetry.dot(connection_vector)
+        if LA.norm(residual, np.inf) < 1E-6:
             has_symmetry = 1
             position_of_symmetry_axis = g
             break

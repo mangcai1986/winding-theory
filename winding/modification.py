@@ -22,12 +22,25 @@ from winding.transforms import connection_vector_to_connection_matrix
 
 
 # ============================================================================
+# Constants
+# ============================================================================
+
+# Scaling factor for converting float conductor distributions to integers.
+# The ideal distribution is normalized to [0,1]; multiplying by N*100 gives
+# a resolution of 1/(N*100) for integer rounding.
+_CONDUCTOR_INT_SCALE = 100
+
+
+# ============================================================================
 # Connection enumeration functions
 # ============================================================================
 
 def obtain_connection(conductor_distribution):
-    """
-    Enumerate all possible double-way connections for a conductor distribution.
+    """Enumerate all possible double-way connections for a conductor distribution.
+
+    A double-way connection starts from each positive conductor and traverses
+    alternatingly to the nearest negative and positive conductors, forming a
+    closed path that returns to the starting point.
 
     Parameters
     ----------
@@ -77,8 +90,7 @@ def obtain_connection(conductor_distribution):
 
 
 def obtain_set_of_connection(conductor_distribution):
-    """
-    Obtain the optimal set of connections (minimizing total path + unique pitches).
+    """Obtain the optimal set of connections (minimizing total path + unique pitches).
 
     Parameters
     ----------
@@ -126,8 +138,7 @@ def obtain_set_of_connection(conductor_distribution):
 
 
 def obtain_mcoil_connection(conductor_distribution):
-    """
-    Multi-coil connection: pair positive and negative conductors
+    """Multi-coil connection: pair positive and negative conductors
     with similar magnitudes (minimal deviation).
 
     Parameters
@@ -167,8 +178,7 @@ def obtain_mcoil_connection(conductor_distribution):
 
 
 def obtain_mcond_connection(conductor_distribution):
-    """
-    Multi-conductor connection: shortest path with minimal unique pitches.
+    """Multi-conductor connection: shortest path with minimal unique pitches.
 
     Parameters
     ----------
@@ -220,12 +230,121 @@ def obtain_mcond_connection(conductor_distribution):
 
 
 # ============================================================================
+# Internal: common template for winding topology derivation
+# ============================================================================
+
+def _build_connection_matrix(conn_vec, n_slots, n_coils_extra=0):
+    """Build a connection matrix from a connection vector (coil indices).
+
+    Parameters
+    ----------
+    conn_vec : ndarray
+        Array of shape (n_coils, 2) with [positive, negative] slot indices.
+    n_slots : int
+        Number of slots.
+    n_coils_extra : int
+        Extra columns for multi-conductor common conductor.
+
+    Returns
+    -------
+    ndarray
+        Connection matrix of shape (n_slots, n_coils + n_coils_extra).
+    """
+    n_coils = conn_vec.shape[0]
+    conn_matrix = np.zeros((n_slots, n_coils + n_coils_extra))
+    for i in range(n_coils):
+        conn_matrix[conn_vec[i, 0], i] = 1
+        conn_matrix[conn_vec[i, 1], i] = -1
+    return conn_matrix
+
+
+def _integer_cond_ideal(connection_vector):
+    """Convert a float conductor distribution to a scaled integer array.
+
+    Parameters
+    ----------
+    connection_vector : ndarray
+        Float conductor distribution vector.
+
+    Returns
+    -------
+    ndarray
+        Integer conductor distribution (scaled by N * _CONDUCTOR_INT_SCALE).
+    """
+    N = connection_vector.size
+    return np.rint(connection_vector * N * _CONDUCTOR_INT_SCALE).astype(int)
+
+
+def _build_topo_from_coil_group(coil_group, connection_fn, is_sp=False):
+    """Template for winding topology derivation from a coil group.
+
+    Parameters
+    ----------
+    coil_group : CoilGroup
+        Primitive coil group.
+    connection_fn : callable
+        Function that takes (cond_ideal) and returns
+        (conn_vec, pitch_vec, n_coils).
+    is_sp : bool
+        If True, use single-way shortest-path logic (multi-conductor).
+
+    Returns
+    -------
+    PriMultiLayerTurnPitchTopo
+        Resulting winding topology.
+    """
+    a = coil_group
+
+    cond_ideal = _integer_cond_ideal(a.connection_vector)
+    conn_vec, pitch_vec, n_coils = connection_fn(cond_ideal)
+
+    if not is_sp:
+        # Standard: double-way or multi-coil
+        conn_matrix = _build_connection_matrix(conn_vec, cond_ideal.size)
+        n_turns, error, cond_real = calculate_number_of_turns(conn_matrix, cond_ideal)
+        multi_cond_matrix = 0
+    else:
+        # Multi-conductor (SP): extra common conductor column
+        conn_matrix = _build_connection_matrix(conn_vec, cond_ideal.size, n_coils_extra=1)
+        multi_cond_matrix = np.zeros((cond_ideal.size, n_coils))
+
+        for i in range(n_coils):
+            conn_matrix[conn_vec[i, 1], -1] = np.sign(
+                np.sum(cond_ideal[conn_vec[i, :]]))
+            multi_cond_matrix[conn_vec[i, 1], i] = np.sign(
+                np.sum(cond_ideal[conn_vec[i, :]]))
+
+        n_turns, error, cond_real = calculate_number_of_turns(conn_matrix, cond_ideal)
+
+        # Normalize by common conductor turns
+        if n_turns[-1] != 0:
+            n_turns = n_turns / n_turns[-1]
+        n_turns = np.rint(n_turns)
+        cond_real = conn_matrix.dot(n_turns)
+
+        conn_matrix = conn_matrix[:, :-1]
+        n_turns = n_turns[:-1]
+
+        error_abs = cond_real * n_turns[-1] - cond_ideal
+        error = LA.norm(error_abs.astype(float)) / LA.norm(cond_ideal.astype(float))
+
+    return PriMultiLayerTurnPitchTopo(
+        cond_ideal, cond_real, conn_vec, pitch_vec, conn_matrix,
+        n_turns, error, multi_cond_matrix=multi_cond_matrix,
+        msym_matrix=a.mirror_symmetry_matrix,
+        rsym_matrix_i=a.rotation_symmetry_matrix,
+        rsym_matrix_ii=a.rotation_symmetry_matrix_type_ii,
+        m_pha_curr_sys=a.current_system,
+        _msym_matrix=a._mirror_symmetry_matrix,
+        working_harmonic=a.working_harmonic)
+
+
+# ============================================================================
 # Winding topology derivation functions
 # ============================================================================
 
 def winding_topology_double_way_connection(coil_groups):
-    """
-    Derive winding topologies using double-way connection
+    """Derive winding topologies using double-way connection
     (multi-layer topology approximation).
 
     Parameters
@@ -238,40 +357,12 @@ def winding_topology_double_way_connection(coil_groups):
     list of PriMultiLayerTurnPitchTopo
         Resulting winding topologies.
     """
-    results = []
-    for a in coil_groups:
-        working_harmonic = a.parent_single_phase_winding.parent_multi_phase_winding.parent_mmf.parent_winding_spectrum.working_harmonic
-        msym_matrix = a.mirror_symmetry_matrix
-        rsym_i = a.parent_single_phase_winding.rotation_symmetry_matrix
-        rsym_ii = a.parent_single_phase_winding.rotation_symmetry_matrix_type_ii
-        current_sys = a.parent_single_phase_winding.parent_multi_phase_winding.current_system
-        _msym = a._mirror_symmetry_matrix
-
-        cond_ideal = a.connection_vector
-        cond_ideal = np.rint(cond_ideal * cond_ideal.size * 1e2).astype(int)
-
-        conn_vec, pitch_vec, n_coils = obtain_set_of_connection(cond_ideal)
-        conn_matrix = np.zeros((cond_ideal.size, n_coils))
-        for i in range(n_coils):
-            conn_matrix[conn_vec[i, 0], i] = 1
-            conn_matrix[conn_vec[i, 1], i] = -1
-
-        n_turns, error, cond_real = calculate_number_of_turns(conn_matrix, cond_ideal)
-
-        topo = PriMultiLayerTurnPitchTopo(
-            cond_ideal, cond_real, conn_vec, pitch_vec, conn_matrix,
-            n_turns, error,
-            msym_matrix=msym_matrix, rsym_matrix_i=rsym_i,
-            rsym_matrix_ii=rsym_ii, m_pha_curr_sys=current_sys,
-            _msym_matrix=_msym, working_harmonic=working_harmonic)
-        results.append(topo)
-
-    return results
+    return [_build_topo_from_coil_group(a, obtain_set_of_connection)
+            for a in coil_groups]
 
 
 def winding_topology_single_way_connection_md(coil_groups):
-    """
-    Derive winding topologies using single-way connection
+    """Derive winding topologies using single-way connection
     with minimal deviation (multi-coil approach).
 
     Parameters
@@ -284,40 +375,12 @@ def winding_topology_single_way_connection_md(coil_groups):
     list of PriMultiLayerTurnPitchTopo
         Resulting winding topologies.
     """
-    results = []
-    for a in coil_groups:
-        working_harmonic = a.parent_single_phase_winding.parent_multi_phase_winding.parent_mmf.parent_winding_spectrum.working_harmonic
-        msym_matrix = a.mirror_symmetry_matrix
-        _msym = a._mirror_symmetry_matrix
-        rsym_i = a.parent_single_phase_winding.rotation_symmetry_matrix
-        rsym_ii = a.parent_single_phase_winding.rotation_symmetry_matrix_type_ii
-        current_sys = a.parent_single_phase_winding.parent_multi_phase_winding.current_system
-
-        cond_ideal = a.connection_vector
-        cond_ideal = np.rint(cond_ideal * cond_ideal.size * 1e2).astype(int)
-
-        conn_vec, pitch_vec, n_coils = obtain_mcoil_connection(cond_ideal)
-        conn_matrix = np.zeros((cond_ideal.size, n_coils))
-        for i in range(n_coils):
-            conn_matrix[conn_vec[i, 0], i] = 1
-            conn_matrix[conn_vec[i, 1], i] = -1
-
-        n_turns, error, cond_real = calculate_number_of_turns(conn_matrix, cond_ideal)
-
-        topo = PriMultiLayerTurnPitchTopo(
-            cond_ideal, cond_real, conn_vec, pitch_vec, conn_matrix,
-            n_turns, error,
-            msym_matrix=msym_matrix, rsym_matrix_i=rsym_i,
-            rsym_matrix_ii=rsym_ii, m_pha_curr_sys=current_sys,
-            _msym_matrix=_msym, working_harmonic=working_harmonic)
-        results.append(topo)
-
-    return results
+    return [_build_topo_from_coil_group(a, obtain_mcoil_connection)
+            for a in coil_groups]
 
 
 def winding_topology_single_way_connection_sp(coil_groups):
-    """
-    Derive winding topologies using single-way connection
+    """Derive winding topologies using single-way connection
     with shortest path (multi-conductor approach).
 
     Parameters
@@ -330,53 +393,8 @@ def winding_topology_single_way_connection_sp(coil_groups):
     list of PriMultiLayerTurnPitchTopo
         Resulting winding topologies.
     """
-    results = []
-    for a in coil_groups:
-        working_harmonic = a.parent_single_phase_winding.parent_multi_phase_winding.parent_mmf.parent_winding_spectrum.working_harmonic
-        msym_matrix = a.mirror_symmetry_matrix
-        _msym = a._mirror_symmetry_matrix
-        rsym_i = a.parent_single_phase_winding.rotation_symmetry_matrix
-        rsym_ii = a.parent_single_phase_winding.rotation_symmetry_matrix_type_ii
-        current_sys = a.parent_single_phase_winding.parent_multi_phase_winding.current_system
-
-        cond_ideal = a.connection_vector
-        cond_ideal = np.rint(cond_ideal * cond_ideal.size * 1e2).astype(int)
-
-        conn_vec, pitch_vec, n_coils = obtain_mcond_connection(cond_ideal)
-        conn_matrix = np.zeros((cond_ideal.size, n_coils + 1))
-        multi_cond_matrix = np.zeros((cond_ideal.size, n_coils))
-
-        for i in range(n_coils):
-            conn_matrix[conn_vec[i, 0], i] = +1
-            conn_matrix[conn_vec[i, 1], i] = -1
-            conn_matrix[conn_vec[i, 1], -1] = np.sign(
-                np.sum(cond_ideal[conn_vec[i, :]]))
-            multi_cond_matrix[conn_vec[i, 1], i] = np.sign(
-                np.sum(cond_ideal[conn_vec[i, :]]))
-
-        n_turns, error, cond_real = calculate_number_of_turns(conn_matrix, cond_ideal)
-
-        # Normalization
-        if n_turns[-1] != 0:
-            n_turns = n_turns / n_turns[-1]
-        n_turns = np.rint(n_turns)
-        cond_real = conn_matrix.dot(n_turns)
-
-        conn_matrix_final = conn_matrix[:, :-1]
-        n_turns_final = n_turns[:-1]
-
-        error_abs = cond_real * n_turns[-1] - cond_ideal
-        error_rel = LA.norm(error_abs.astype(float)) / LA.norm(cond_ideal.astype(float))
-
-        topo = PriMultiLayerTurnPitchTopo(
-            cond_ideal, cond_real, conn_vec, pitch_vec, conn_matrix_final,
-            n_turns_final, error_rel, multi_cond_matrix=multi_cond_matrix,
-            msym_matrix=msym_matrix, rsym_matrix_i=rsym_i,
-            rsym_matrix_ii=rsym_ii, m_pha_curr_sys=current_sys,
-            _msym_matrix=_msym, working_harmonic=working_harmonic)
-        results.append(topo)
-
-    return results
+    return [_build_topo_from_coil_group(a, obtain_mcond_connection, is_sp=True)
+            for a in coil_groups]
 
 
 # ============================================================================
@@ -384,8 +402,7 @@ def winding_topology_single_way_connection_sp(coil_groups):
 # ============================================================================
 
 def obtain_multi_turn_winding_topology(primitive_topologies):
-    """
-    Derive multi-turn winding topology by selecting coils with the
+    """Derive multi-turn winding topology by selecting coils with the
     most common coil pitch.
 
     Parameters
@@ -424,8 +441,7 @@ def obtain_multi_turn_winding_topology(primitive_topologies):
 
 
 def obtain_multi_layer_winding_topology(multi_turn_topologies):
-    """
-    Derive multi-layer winding topology from multi-turn topologies
+    """Derive multi-layer winding topology from multi-turn topologies
     by normalizing turns to the minimum.
 
     Parameters
@@ -461,8 +477,7 @@ def obtain_multi_layer_winding_topology(multi_turn_topologies):
 
 
 def obtain_double_layer_winding_topology(multi_coil_topologies):
-    """
-    Derive double-layer (single-turn) winding topology from multi-coil topologies.
+    """Derive double-layer (single-turn) winding topology from multi-coil topologies.
 
     Parameters
     ----------
@@ -497,8 +512,9 @@ def obtain_double_layer_winding_topology(multi_coil_topologies):
 
 
 def obtain_single_layer_winding_topology(multi_turn_topologies):
-    """
-    Derive single-layer winding topology from multi-turn topologies.
+    """Derive single-layer winding topology from multi-turn topologies.
+
+    Selects the coils with the largest number of turns (upper half).
 
     Parameters
     ----------
@@ -543,7 +559,26 @@ def obtain_single_layer_winding_topology(multi_turn_topologies):
 def get_number_of_layer(set_of_coil, mirror_symmetry_matrix,
                         rotation_symmetry_matrix, matrix_of_rotation_symmetry_type_ii,
                         single_turn_multi_turn):
-    """Calculate the number of winding layers."""
+    """Calculate the number of winding layers.
+
+    Parameters
+    ----------
+    set_of_coil : ndarray
+        Coil connection set.
+    mirror_symmetry_matrix : ndarray
+        Mirror symmetry matrix.
+    rotation_symmetry_matrix : ndarray
+        Rotation symmetry matrix (type I).
+    matrix_of_rotation_symmetry_type_ii : ndarray
+        Rotation symmetry matrix (type II).
+    single_turn_multi_turn : str
+        'MultiTurn' or 'SingleTurn' mode.
+
+    Returns
+    -------
+    int
+        Number of winding layers.
+    """
     set_of_coil = set_of_coil.copy()
     if single_turn_multi_turn == 'MultiTurn':
         set_of_coil[np.abs(set_of_coil) > 1e-6] = 1
@@ -563,7 +598,18 @@ def get_number_of_layer(set_of_coil, mirror_symmetry_matrix,
 
 
 def get_number_of_unique_pitch(coils):
-    """Count unique coil pitches across a set of coils."""
+    """Count unique coil pitches across a set of coils.
+
+    Parameters
+    ----------
+    coils : list of Coil
+        List of coil objects.
+
+    Returns
+    -------
+    int
+        Number of unique pitches.
+    """
     pitches = coils[0].pitch
     for j in range(1, len(coils)):
         pitches = np.append(pitches, coils[j].pitch)
@@ -571,7 +617,18 @@ def get_number_of_unique_pitch(coils):
 
 
 def get_unique_winding_spectrum(set_of_winding_spectra):
-    """Find indices of unique winding spectra."""
+    """Find indices of unique winding spectra.
+
+    Parameters
+    ----------
+    set_of_winding_spectra : list of ndarray
+        List of winding spectrum arrays.
+
+    Returns
+    -------
+    ndarray
+        Indices of unique spectra.
+    """
     def sum_str_vector(sv):
         result = sv[0]
         for i in range(1, sv.size):
@@ -591,10 +648,19 @@ def get_unique_winding_spectrum(set_of_winding_spectra):
 
 
 def classify_set_of_coil(set_of_coil):
-    """
-    Classify coils by pitch, winding factor, and spectrum type.
+    """Classify coils by pitch, winding factor, and spectrum type.
 
     Returns a nested list structure for topology selection.
+
+    Parameters
+    ----------
+    set_of_coil : list of list of Coil
+        Nested list of coil objects.
+
+    Returns
+    -------
+    list of list of dict
+        Each dict has keys: 'type', 'value', 'coils'.
     """
     n_types = len(set_of_coil)
     all_categories = []
@@ -630,9 +696,23 @@ def classify_set_of_coil(set_of_coil):
 
 
 def category_of_coil_to_multiphase_winding(category_of_coil, set_of_multiphase_winding):
-    """
-    Convert a category of coils to a modified multi-phase winding topology
-    (legacy function, see design pipeline for new code).
+    """Convert a category of coils to a modified multi-phase winding topology.
+
+    .. note::
+        This is a legacy function. For new code, use the design pipeline
+        (get_coil -> modification functions) directly.
+
+    Parameters
+    ----------
+    category_of_coil : CategoryOfCoil
+        Category of coils.
+    set_of_multiphase_winding : list
+        Multi-phase winding set (unused, kept for API compatibility).
+
+    Returns
+    -------
+    ModifiedMultiPhaseWinding
+        Modified multi-phase winding topology.
     """
     from winding.models import ModifiedMultiPhaseWinding
     coils = category_of_coil.set_of_coil
@@ -671,11 +751,11 @@ def category_of_coil_to_multiphase_winding(category_of_coil, set_of_multiphase_w
     winding = ModifiedMultiPhaseWinding()
     winding.set_of_coil = A[:, :] * x_single[:, 0]
     winding.connection_vector = (A.dot(x_single))[:, 0]
-    winding.current_system = coils[0].parent_coil_group.parent_single_phase_winding.parent_multi_phase_winding.current_system
+    winding.current_system = coils[0].parent_coil_group.current_system
     winding.mirror_symmetry_matrix = coils[0].parent_coil_group.mirror_symmetry_matrix
     winding._mirror_symmetry_matrix = coils[0].parent_coil_group._mirror_symmetry_matrix
-    winding.rotation_symmetry_matrix = coils[0].parent_coil_group.parent_single_phase_winding.rotation_symmetry_matrix
-    winding.matrix_of_rotation_symmetry_type_ii = coils[0].parent_coil_group.parent_single_phase_winding.rotation_symmetry_matrix_type_ii
+    winding.rotation_symmetry_matrix = coils[0].parent_coil_group.rotation_symmetry_matrix
+    winding.matrix_of_rotation_symmetry_type_ii = coils[0].parent_coil_group.rotation_symmetry_matrix_type_ii
     winding.has_rotation_symmetry = coils[0].parent_coil_group.parent_single_phase_winding.has_symmetry
     winding.has_mirror_symmetry = coils[0].parent_coil_group.has_symmetry
 

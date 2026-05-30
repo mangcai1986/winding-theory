@@ -126,10 +126,10 @@ def get_single_phase_winding(multi_phase_windings, current_system_flag):
                 if current_system_flag == 1:
                     connection_matrix_[:, 0] = -connection_matrix_[:, 0]
 
-                residum = connection_matrix_ - matrix_of_rotation_symmetry_type_i.dot(
+                residual = connection_matrix_ - matrix_of_rotation_symmetry_type_i.dot(
                     connection_matrix).dot(matrix_of_rotation_symmetry_type_ii_)
 
-                if LA.norm(residum, np.inf) < 1E-10:
+                if LA.norm(residual, np.inf) < 1E-10:
                     has_symmetry = 1
                     matrix_of_rotation_symmetry = matrix_of_rotation_symmetry_type_i
                     matrix_of_rotation_symmetry_type_ii = matrix_of_rotation_symmetry_type_ii_
