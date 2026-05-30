@@ -108,7 +108,23 @@ winding-theory/
 ├── examples/          # Runable example scripts
 ├── tests/             # Unit tests
 └── docs/              # Documentation
+    ├── paper_reference.md   # Code ↔ Thesis mapping
+    ├── thesis/              # Original thesis files
+    └── research/            # Research tracking & literature survey
 ```
+
+## Research & Frontier Tracking
+
+This repository maintains a **living literature survey** and **development roadmap**
+to track the state of the art in winding topology theory:
+
+- [Literature Survey](docs/research/literature-survey.md) — Categorized survey of all related work since 2016
+- [Method Comparison](docs/research/comparison-with-unified-method.md) — How the unified method compares to tensor, FSCW, and other approaches
+- [Frontier Tracking Log](docs/research/frontier-tracking-log.md) — Timestamped search records, continuously updated
+- [Citation Tracking](docs/research/citation-tracking.md) — Who cites the thesis and how
+- [Development Roadmap](docs/research/development-roadmap.md) — P0–P5 prioritized implementation plan
+
+**Goal:** Make this repository the world's central hub for winding topology theory.
 
 ## Citation
 
